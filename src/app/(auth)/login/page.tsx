@@ -12,10 +12,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  COGNITO_ENV_HELP,
-  isCognitoMisconfigured,
-} from "@/lib/cognito-env";
+import { isCognitoMisconfigured } from "@/lib/cognito-env";
+
+const COGNITO_CONFIG_SHORT =
+  "Cognito の User Pool ID とアプリクライアント ID（環境変数）を確認してください。";
 
 const DEV_AUTO_LOGIN_KEY = "fk-dev-auto-login-attempted";
 const DEV_AUTO_LOGIN_PENDING = "fk-dev-auto-login-pending";
@@ -28,11 +28,11 @@ const ATTRIBUTE_LABELS: Partial<Record<UserAttributeKey, string>> = {
   nickname: "ニックネーム",
 };
 
-function formatAuthError(err: unknown, cognitoHelp: string): string {
+function formatAuthError(err: unknown): string {
   const raw =
     err instanceof Error ? err.message : "ログインに失敗しました";
   return raw.includes("placeholder") || raw.includes("does not exist")
-    ? `${raw}\n\n${cognitoHelp}`
+    ? `${raw}\n\n${COGNITO_CONFIG_SHORT}`
     : raw;
 }
 
@@ -211,7 +211,7 @@ export default function LoginPage() {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          setErrorMessage(formatAuthError(err, COGNITO_ENV_HELP));
+          setErrorMessage(formatAuthError(err));
           setDevLoginMessage(null);
         }
         sessionStorage.removeItem(DEV_AUTO_LOGIN_PENDING);
@@ -237,7 +237,7 @@ export default function LoginPage() {
     e.preventDefault();
     setErrorMessage(null);
     if (isCognitoMisconfigured()) {
-      setErrorMessage(COGNITO_ENV_HELP);
+      setErrorMessage(COGNITO_CONFIG_SHORT);
       return;
     }
     setIsSubmitting(true);
@@ -245,7 +245,7 @@ export default function LoginPage() {
       const result = await signIn({ username, password });
       await handleSignInResult(result);
     } catch (err: unknown) {
-      setErrorMessage(formatAuthError(err, COGNITO_ENV_HELP));
+      setErrorMessage(formatAuthError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -296,7 +296,7 @@ export default function LoginPage() {
         setErrorMessage(unhandledSignInMessage(result.nextStep));
       }
     } catch (err: unknown) {
-      setErrorMessage(formatAuthError(err, COGNITO_ENV_HELP));
+      setErrorMessage(formatAuthError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -329,27 +329,18 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FAFAF8] px-6 py-14 sm:px-10">
       <div className="w-full max-w-[420px]">
-        <p className="font-brand text-[0.8125rem] font-semibold uppercase tracking-[0.28em] text-[#8B0000]">
-          Fire Kids
-        </p>
-        <h1 className="font-display mt-4 text-[2rem] font-semibold leading-tight tracking-tight text-stone-900 sm:text-[2.35rem]">
-          ログイン
-        </h1>
-        <p className="mt-4 text-sm leading-relaxed text-stone-600">
-          社内向け仕入れ補助ツールです。お手元のユーザー名とパスワードで Cognito
-          （User Pool）にサインインしてください。
-        </p>
+        <header className="text-center">
+          <p className="font-brand text-[calc(0.8125rem*1.5)] font-semibold uppercase tracking-[0.28em] text-[#8B0000]">
+            Fire Kids
+          </p>
+          <h1 className="font-display mt-4 text-[2rem] font-semibold leading-tight tracking-tight text-stone-900 sm:text-[2.35rem]">
+            ログイン
+          </h1>
+        </header>
 
         {devLoginMessage ? (
-          <p className="mt-4 text-sm text-stone-600">{devLoginMessage}</p>
-        ) : null}
-
-        {isCognitoMisconfigured() ? (
-          <p
-            className="mt-4 rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-sm whitespace-pre-line text-amber-950"
-            role="status"
-          >
-            {COGNITO_ENV_HELP}
+          <p className="mt-4 text-center text-sm text-stone-600">
+            {devLoginMessage}
           </p>
         ) : null}
 
