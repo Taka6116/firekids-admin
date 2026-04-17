@@ -22,6 +22,3 @@ export function isCognitoMisconfigured(): boolean {
   }
   return false;
 }
-
-export const COGNITO_ENV_HELP =
-  "`.env.local` に、AWS Cognito の実値を設定してください: `NEXT_PUBLIC_COGNITO_USER_POOL_ID`（例: ap-northeast-1_xxxx）と `NEXT_PUBLIC_COGNITO_CLIENT_ID`（アプリクライアント ID）。設定後は `npm run dev` を再起動します。";
