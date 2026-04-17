@@ -4,7 +4,7 @@ import { getJwtToken } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/constants";
 
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/api`,
 });
 
 apiClient.interceptors.request.use(async (config) => {
