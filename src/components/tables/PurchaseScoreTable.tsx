@@ -190,12 +190,19 @@ export function PurchaseScoreTable({ data }: { data: PurchaseScoreItem[] }) {
           {table.getRowModel().rows.map((row, i) => (
             <TableRow
               key={row.id}
-              className={`border-stone-100 transition-colors ${
-                i % 2 === 1 ? "bg-stone-50/50 hover:bg-stone-100/50" : "hover:bg-stone-50"
+              className={`group relative border-stone-100 transition-all duration-150 ${
+                i % 2 === 1 ? "bg-stone-50/50 hover:bg-stone-100/60" : "hover:bg-stone-50"
               }`}
             >
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id} className="whitespace-nowrap py-3">
+              {row.getVisibleCells().map((cell, ci) => (
+                <TableCell
+                  key={cell.id}
+                  className={`whitespace-nowrap py-3 ${
+                    ci === 0
+                      ? "border-l-[3px] border-l-transparent transition-colors duration-150 group-hover:border-l-[#8B0000]"
+                      : ""
+                  }`}
+                >
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </TableCell>
               ))}

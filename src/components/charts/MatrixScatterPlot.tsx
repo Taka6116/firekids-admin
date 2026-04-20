@@ -35,6 +35,19 @@ const ZONE_ORDER: MatrixZone[] = [
   "underdog",
 ];
 
+const ZONE_ACTION: Record<MatrixZone, { text: string; class: string }> = {
+  star: { text: "積極的に仕入れるべき商品です。在庫を積み増しましょう。", class: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  golden_tree: { text: "高単価商品として厳選して仕入れましょう。", class: "text-yellow-700 bg-yellow-50 border-yellow-200" },
+  problem_child: { text: "仕入れ価格の見直しを検討してください。", class: "text-orange-700 bg-orange-50 border-orange-200" },
+  underdog: { text: "仕入れ停止を検討することを推奨します。", class: "text-slate-600 bg-slate-50 border-slate-200" },
+};
+
+const CHANNEL_LABEL: Record<MatrixItem["channel"], string> = {
+  auction: "オークション",
+  dealer: "ディーラー",
+  individual: "個人買取",
+};
+
 function buildPlotData(
   items: MatrixItem[],
   mids: { midSpeed: number; midMargin: number },
@@ -72,10 +85,7 @@ export function MatrixScatterPlot({ items }: { items: MatrixItem[] }) {
     })).filter((s) => s.data.length > 0);
     const colorsBuilt = seriesBuilt.map((s) => matrixZoneColor[s.id]);
     return {
-      series: seriesBuilt.map((s) => ({
-        id: s.label,
-        data: s.data,
-      })),
+      series: seriesBuilt.map((s) => ({ id: s.label, data: s.data })),
       colors: colorsBuilt,
       midSpeed: mids.midSpeed,
       midMargin: mids.midMargin,
@@ -86,12 +96,7 @@ export function MatrixScatterPlot({ items }: { items: MatrixItem[] }) {
     () =>
       series.map((s) => ({
         id: s.id,
-        data: s.data.map((d) => ({
-          x: d.x,
-          y: d.y,
-          size: d.size,
-          meta: d,
-        })),
+        data: s.data.map((d) => ({ x: d.x, y: d.y, size: d.size, meta: d })),
       })),
     [series],
   );
@@ -100,12 +105,8 @@ export function MatrixScatterPlot({ items }: { items: MatrixItem[] }) {
     const prev = prevSelectedRef.current;
     prevSelectedRef.current = selected;
     const becameSelected = selected !== null && prev === null;
-    if (!becameSelected || !detailPanelRef.current) {
-      return;
-    }
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+    if (!becameSelected || !detailPanelRef.current) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     detailPanelRef.current.scrollIntoView({
       behavior: reduceMotion ? "auto" : "smooth",
       block: "nearest",
@@ -113,17 +114,17 @@ export function MatrixScatterPlot({ items }: { items: MatrixItem[] }) {
   }, [selected]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,280px)]">
+    <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,300px)]">
       <DashboardCard>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             回転スピード × 粗利率（4象限）
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            X は在庫回転の速さ（スコア化）、Y は粗利率（%）。点の大きさは仕入本数の目安です。
+            X は在庫回転の速さ（スコア化）、Y は粗利率（%）。点の大きさは仕入本数の目安です。クリックで詳細表示。
           </p>
         </CardHeader>
-        <CardContent className="h-[440px] w-full pt-0">
+        <CardContent className="h-[460px] w-full pt-0">
           <ResponsiveScatterPlot
             data={nivoData}
             margin={{ top: 24, right: 24, bottom: 56, left: 64 }}
@@ -173,91 +174,56 @@ export function MatrixScatterPlot({ items }: { items: MatrixItem[] }) {
               },
             }}
             markers={[
-              {
-                axis: "x",
-                value: midSpeed,
-                lineStyle: {
-                  stroke: "rgba(0,0,0,0.15)",
-                  strokeDasharray: "4 4",
-                },
-              },
-              {
-                axis: "y",
-                value: midMargin,
-                lineStyle: {
-                  stroke: "rgba(0,0,0,0.15)",
-                  strokeDasharray: "4 4",
-                },
-              },
+              { axis: "x", value: midSpeed, lineStyle: { stroke: "rgba(0,0,0,0.15)", strokeDasharray: "4 4" } },
+              { axis: "y", value: midMargin, lineStyle: { stroke: "rgba(0,0,0,0.15)", strokeDasharray: "4 4" } },
             ]}
             useMesh
             tooltip={({ node }) => {
               const meta = node.data as { meta?: PlotDatum };
               const d = meta.meta;
-              if (!d) {
-                return null;
-              }
+              if (!d) return null;
               return (
                 <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
-                  <div className="font-semibold">
-                    {d.brand} {d.model}
-                  </div>
-                  <div>回転: {d.turnoverMonths.toFixed(1)} ヶ月</div>
-                  <div>粗利: {d.grossMargin}%</div>
-                  <div className="text-muted-foreground">
-                    {matrixZoneLabel[d.zone]}
-                  </div>
+                  <div className="font-semibold">{d.brand} {d.model}</div>
+                  <div>平均 {d.turnoverMonths.toFixed(1)} ヶ月で売れています</div>
+                  <div>仕入価格の {d.grossMargin}% の利益</div>
+                  <div className="text-muted-foreground">{matrixZoneLabel[d.zone]}</div>
                 </div>
               );
             }}
             onClick={(node) => {
               const meta = node.data as { meta?: PlotDatum };
-              if (meta.meta) {
-                setSelected(meta.meta);
-              }
+              if (meta.meta) setSelected(meta.meta);
             }}
           />
         </CardContent>
       </DashboardCard>
 
       <div className="flex flex-col gap-4">
+        {/* 分析サマリ */}
         <DashboardCard>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">分析サマリ</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-xs leading-relaxed text-muted-foreground">
             <p>
-              中央の破線は、表示中データの<strong className="text-foreground">中央値</strong>
-              で区切った4象限です。
+              中央の破線は表示中データの<strong className="text-foreground">中央値</strong>で区切った4象限です。
             </p>
             <ul className="list-inside list-disc space-y-1">
-              <li>
-                <span className="font-medium text-emerald-700">スター</span>
-                ：横（回転の速さ）が中央値以上 かつ 縦（粗利率）が中央値以上
-              </li>
-              <li>
-                <span className="font-medium text-blue-700">金のなる木</span>
-                ：横が中央値未満 かつ 縦が中央値以上
-              </li>
-              <li>
-                <span className="font-medium text-orange-700">問題児</span>
-                ：横が中央値以上 かつ 縦が中央値未満
-              </li>
-              <li>
-                <span className="font-medium text-slate-600">負け犬</span>
-                ：横が中央値未満 かつ 縦が中央値未満
-              </li>
+              <li><span className="font-medium text-emerald-700">スター</span>：高回転・高粗利 → 積極仕入れ</li>
+              <li><span className="font-medium text-yellow-700">金のなる木</span>：低回転・高粗利 → 厳選仕入れ</li>
+              <li><span className="font-medium text-orange-700">問題児</span>：高回転・低粗利 → 価格見直し</li>
+              <li><span className="font-medium text-slate-600">負け犬</span>：低回転・低粗利 → 仕入停止検討</li>
             </ul>
           </CardContent>
         </DashboardCard>
 
+        {/* モデル詳細 */}
         <div
           ref={detailPanelRef}
           className={cn(
             "rounded-xl transition-[box-shadow,ring-color] duration-200 motion-reduce:transition-none",
-            selected
-              ? "ring-2 ring-[#8B0000]/25 shadow-md"
-              : "ring-0 shadow-none",
+            selected ? "ring-2 ring-[#8B0000]/25 shadow-md" : "ring-0 shadow-none",
           )}
         >
           <DashboardCard>
@@ -269,27 +235,25 @@ export function MatrixScatterPlot({ items }: { items: MatrixItem[] }) {
             </CardHeader>
             <CardContent className="text-sm">
               {selected ? (
-                <div className="space-y-2">
-                  <p className="text-base font-semibold text-foreground">
-                    {selected.brand}{" "}
-                    <span className="text-muted-foreground">{selected.model}</span>
-                  </p>
-                  <dl className="grid grid-cols-[6rem_1fr] gap-y-1 text-xs">
-                    <dt className="text-muted-foreground">在庫回転</dt>
-                    <dd>{selected.turnoverMonths.toFixed(1)} ヶ月</dd>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-base font-semibold text-foreground">{selected.brand}</p>
+                    <p className="text-sm text-muted-foreground">{selected.model}</p>
+                  </div>
+                  <dl className="grid grid-cols-[7rem_1fr] gap-y-2 text-xs">
+                    <dt className="text-muted-foreground">回転スピード</dt>
+                    <dd className="font-medium">平均 {selected.turnoverMonths.toFixed(1)} ヶ月で売れています</dd>
                     <dt className="text-muted-foreground">粗利率</dt>
-                    <dd>{selected.grossMargin}%</dd>
+                    <dd className="font-medium">仕入価格の {selected.grossMargin}% の利益</dd>
                     <dt className="text-muted-foreground">仕入区分</dt>
-                    <dd>
-                      {selected.channel === "auction"
-                        ? "オークション"
-                        : selected.channel === "dealer"
-                          ? "ディーラー"
-                          : "個人買取"}
-                    </dd>
+                    <dd>{CHANNEL_LABEL[selected.channel]}</dd>
                     <dt className="text-muted-foreground">象限</dt>
                     <dd>{matrixZoneLabel[selected.zone]}</dd>
                   </dl>
+                  <div className={cn("rounded-md border px-3 py-2 text-xs leading-relaxed", ZONE_ACTION[selected.zone].class)}>
+                    <span className="font-semibold">推奨アクション：</span>
+                    {ZONE_ACTION[selected.zone].text}
+                  </div>
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">

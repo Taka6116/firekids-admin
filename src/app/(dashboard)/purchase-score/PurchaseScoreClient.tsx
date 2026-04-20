@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import { DashboardCard } from "@/components/layout/DashboardCard";
@@ -26,17 +26,73 @@ import { useFilterStore } from "@/stores/filterStore";
 import type { PurchaseScoreItem } from "@/types/purchaseScore";
 
 const ALL = "__all__";
+const OTHER = "__other__";
+
+const KNOWN_BRANDS = [
+  "ロレックス", "パテック・フィリップ", "オーデマ・ピゲ", "オメガ",
+  "カルティエ", "IWC", "ジャガールクルト", "ブレゲ", "ブライトリング",
+  "タグホイヤー", "ヴァシュロン", "グランドセイコー", "セイコー",
+  "シチズン", "チューダー", "ロンジン", "ハミルトン", "パネライ",
+  "フランクミュラー", "ROLEX", "OMEGA", "CARTIER", "TUDOR", "SEIKO",
+];
+const KNOWN_BRANDS_SET = new Set(KNOWN_BRANDS);
 
 function uniqueSorted(values: string[]): string[] {
   return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, "ja"));
 }
 
 function vintageDemandIndex(rows: PurchaseScoreItem[]): number {
-  if (rows.length === 0) {
-    return 0;
-  }
+  if (rows.length === 0) return 0;
   const avg = rows.reduce((s, r) => s + r.score, 0) / rows.length;
   return Math.round(avg * 1.15);
+}
+
+function useCountUp(target: number, duration = 900): number {
+  const [count, setCount] = useState(0);
+  const prevTarget = useRef<number>(target);
+
+  useEffect(() => {
+    if (target === 0) { setCount(0); return; }
+    prevTarget.current = target;
+    const start = performance.now();
+    let raf: number;
+    function tick(now: number) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(eased * target));
+      if (progress < 1) raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+
+  return count;
+}
+
+function SummaryCard({
+  label,
+  value,
+  sub,
+  valueClass = "",
+}: {
+  label: string;
+  value: number;
+  sub: string;
+  valueClass?: string;
+}) {
+  const animated = useCountUp(value);
+  return (
+    <DashboardCard>
+      <CardHeader className="pb-2">
+        <CardDescription>{label}</CardDescription>
+        <CardTitle className={`text-3xl font-semibold tabular-nums ${valueClass}`}>
+          {animated}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="text-xs text-muted-foreground">{sub}</CardContent>
+    </DashboardCard>
+  );
 }
 
 export function PurchaseScoreClient() {
@@ -45,50 +101,58 @@ export function PurchaseScoreClient() {
   const setPurchaseChannel = useFilterStore((s) => s.setPurchaseChannel);
   const setPurchasePriceBand = useFilterStore((s) => s.setPurchasePriceBand);
 
-  // ブランドタブの状態（"__all__" = 全ブランド）
   const [activeBrand, setActiveBrand] = useState<string>(ALL);
 
-  // 全件クエリ（API は 1 回だけ。フィルタリングはクライアント側で完結）
   const { data: allRows = [], isPending, isError, error } = usePurchaseScore({});
+
+  // ブランド別商品数を集計
+  const brandCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of allRows) {
+      map.set(row.brand, (map.get(row.brand) ?? 0) + 1);
+    }
+    return map;
+  }, [allRows]);
+
+  // KNOWN_BRANDSに含まれるブランドを商品数順でTop8まで取得
+  const topBrands = useMemo(() => {
+    return KNOWN_BRANDS
+      .filter((b) => brandCountMap.has(b))
+      .sort((a, b) => (brandCountMap.get(b) ?? 0) - (brandCountMap.get(a) ?? 0))
+      .slice(0, 8);
+  }, [brandCountMap]);
+
+  // 「その他」に含まれるブランドが存在するか
+  const hasOther = useMemo(() => {
+    return allRows.some((r) => !KNOWN_BRANDS_SET.has(r.brand));
+  }, [allRows]);
 
   const activeBrandValue = activeBrand === ALL ? undefined : activeBrand;
 
-  // フィルター適用はクライアント側 useMemo のみ（API 追加リクエストなし）
-  const data = useMemo(
-    () =>
-      allRows.filter((row) => {
-        if (activeBrandValue && row.brand !== activeBrandValue) return false;
-        if (purchaseChannel && row.channel !== purchaseChannel) return false;
-        if (purchasePriceBand && row.price_band !== purchasePriceBand) return false;
-        return true;
-      }),
-    [allRows, activeBrandValue, purchaseChannel, purchasePriceBand],
-  );
+  const data = useMemo(() => {
+    return allRows.filter((row) => {
+      if (activeBrand === OTHER) {
+        if (KNOWN_BRANDS_SET.has(row.brand)) return false;
+      } else if (activeBrandValue && row.brand !== activeBrandValue) {
+        return false;
+      }
+      if (purchaseChannel && row.channel !== purchaseChannel) return false;
+      if (purchasePriceBand && row.price_band !== purchasePriceBand) return false;
+      return true;
+    });
+  }, [allRows, activeBrand, activeBrandValue, purchaseChannel, purchasePriceBand]);
 
-  const brandOptions = useMemo(
-    () => uniqueSorted(allRows.map((r) => r.brand)),
-    [allRows],
-  );
   const bandOptions = useMemo(
     () => uniqueSorted(allRows.map((r) => r.price_band)),
     [allRows],
   );
 
-  const priorityCount = useMemo(
-    () => data.filter((r) => r.score >= 80).length,
-    [data],
-  );
-  const reviewCount = useMemo(
-    () => data.filter((r) => r.score < 50 || r.action === "hold").length,
-    [data],
-  );
+  const priorityCount = useMemo(() => data.filter((r) => r.score >= 80).length, [data]);
+  const reviewCount = useMemo(() => data.filter((r) => r.score < 50 || r.action === "hold").length, [data]);
   const demandIndex = useMemo(() => vintageDemandIndex(data), [data]);
 
   function handleExportCsv() {
-    if (data.length === 0) {
-      toast.error("エクスポートするデータがありません");
-      return;
-    }
+    if (data.length === 0) { toast.error("エクスポートするデータがありません"); return; }
     downloadPurchaseScoreCsv(data);
     toast.success("CSV をダウンロードしました");
   }
@@ -101,64 +165,64 @@ export function PurchaseScoreClient() {
     );
   }
 
+  const tabs = [
+    { value: ALL, label: "全ブランド", count: allRows.length },
+    ...topBrands.map((b) => ({ value: b, label: b, count: brandCountMap.get(b) ?? 0 })),
+    ...(hasOther
+      ? [{ value: OTHER, label: "その他", count: allRows.filter((r) => !KNOWN_BRANDS_SET.has(r.brand)).length }]
+      : []),
+  ];
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
-        <DashboardCard>
-          <CardHeader className="pb-2">
-            <CardDescription>ヴィンテージ時計需要インデックス</CardDescription>
-            <CardTitle className="text-3xl font-semibold tabular-nums">
-              {isPending ? "—" : demandIndex}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            モック集計（スコア平均から算出したダミー指標）
-          </CardContent>
-        </DashboardCard>
-        <DashboardCard>
-          <CardHeader className="pb-2">
-            <CardDescription>優先件数（スコア 80 以上）</CardDescription>
-            <CardTitle className="text-3xl font-semibold tabular-nums text-[#8B0000]">
-              {isPending ? "—" : priorityCount}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            画面上のフィルター適用後の件数
-          </CardContent>
-        </DashboardCard>
-        <DashboardCard>
-          <CardHeader className="pb-2">
-            <CardDescription>要確認件数（スコア 50 未満または保留）</CardDescription>
-            <CardTitle className="text-3xl font-semibold tabular-nums text-amber-700">
-              {isPending ? "—" : reviewCount}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            仕入判断の再確認候補
-          </CardContent>
-        </DashboardCard>
+        <SummaryCard
+          label="ヴィンテージ時計需要インデックス"
+          value={isPending ? 0 : demandIndex}
+          sub="モック集計（スコア平均から算出したダミー指標）"
+        />
+        <SummaryCard
+          label="優先件数（スコア 80 以上）"
+          value={isPending ? 0 : priorityCount}
+          sub="画面上のフィルター適用後の件数"
+          valueClass="text-[#8B0000]"
+        />
+        <SummaryCard
+          label="要確認件数（スコア 50 未満または保留）"
+          value={isPending ? 0 : reviewCount}
+          sub="仕入判断の再確認候補"
+          valueClass="text-amber-700"
+        />
       </div>
 
       {/* ブランドタブ */}
-      <div className="overflow-x-auto">
-        <div className="flex min-w-max gap-1.5 pb-0.5">
-          {[{ value: ALL, label: "全ブランド" }, ...brandOptions.map((b) => ({ value: b, label: b }))].map(
-            (opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setActiveBrand(opt.value)}
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((tab) => {
+          const isActive = activeBrand === tab.value;
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setActiveBrand(tab.value)}
+              className={
+                isActive
+                  ? "inline-flex items-center gap-1.5 rounded-full bg-[#8B0000] px-4 py-1.5 text-sm font-semibold text-white transition-colors duration-150"
+                  : "inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm text-stone-600 transition-colors duration-150 hover:bg-red-50 hover:border-red-200 hover:text-red-800"
+              }
+            >
+              {tab.label}
+              <span
                 className={
-                  activeBrand === opt.value
-                    ? "rounded-full bg-[#8B0000] px-4 py-1.5 text-sm font-semibold text-white transition-colors"
-                    : "rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-900"
+                  isActive
+                    ? "rounded-full bg-white/25 px-1.5 py-0.5 text-[11px] font-bold leading-none tabular-nums text-white"
+                    : "rounded-full bg-stone-100 px-1.5 py-0.5 text-[11px] font-bold leading-none tabular-nums text-stone-500"
                 }
               >
-                {opt.label}
-              </button>
-            ),
-          )}
-        </div>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <DashboardCard>
@@ -170,13 +234,7 @@ export function PurchaseScoreClient() {
           <div className="flex flex-wrap gap-3">
             <Select
               value={purchasePriceBand ?? ALL}
-              onValueChange={(v) => {
-                if (v == null || v === ALL) {
-                  setPurchasePriceBand(undefined);
-                  return;
-                }
-                setPurchasePriceBand(v);
-              }}
+              onValueChange={(v) => setPurchasePriceBand(v === ALL ? undefined : v)}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="価格帯" />
@@ -184,19 +242,14 @@ export function PurchaseScoreClient() {
               <SelectContent>
                 <SelectItem value={ALL}>全価格帯</SelectItem>
                 {bandOptions.map((b) => (
-                  <SelectItem key={b} value={b}>
-                    {b}
-                  </SelectItem>
+                  <SelectItem key={b} value={b}>{b}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select
               value={purchaseChannel ?? ALL}
               onValueChange={(v) => {
-                if (v == null || v === ALL) {
-                  setPurchaseChannel(undefined);
-                  return;
-                }
+                if (v === ALL) { setPurchaseChannel(undefined); return; }
                 setPurchaseChannel(v as PurchaseScoreItem["channel"]);
               }}
             >
