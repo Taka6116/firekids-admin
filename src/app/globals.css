@@ -98,6 +98,135 @@
   }
 }
 
+/* ─── カスタムスライダー（予算シミュレータ用） ─── */
+.budget-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Firefox トラック */
+.budget-range::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: #e7e5e4;
+}
+.budget-range::-moz-range-progress {
+  height: 8px;
+  border-radius: 9999px;
+  background: #8B0000;
+}
+
+/* WebKit サム */
+.budget-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #8B0000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.budget-range::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(139, 0, 0, 0.25);
+}
+.budget-range:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  background: #8B0000;
+  border-color: white;
+  transform: scale(1.1);
+}
+
+/* Firefox サム */
+.budget-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #8B0000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.budget-range::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(139, 0, 0, 0.25);
+}
+.budget-range:active::-moz-range-thumb {
+  cursor: grabbing;
+  background: #8B0000;
+  border-color: white;
+}
+
+/* ─── 時計ローダー：秒針（カチカチ） ─── */
+@keyframes secondHand {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── 時計ローダー：分針（なめらか） ─── */
+@keyframes minuteHand {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── 時計ローダー：ドット点滅 ─── */
+@keyframes dotPulse {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ─── ページフェードイン ─── */
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-fadein {
+  animation: pageFadeIn 0.25s ease-out forwards;
+}
+
+/* 含み益「要対応」バッジなど */
+@keyframes pulse-red {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+.alert-pulse {
+  animation: pulse-red 2s ease-in-out infinite;
+}
+
 /* 印刷: window.print() 用（予算シミュレータの .print-only / ナビ非表示） */
 .print-only {
   display: none;

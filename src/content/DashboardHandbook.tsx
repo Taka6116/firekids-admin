@@ -202,22 +202,23 @@ function MarketWatchTab() {
         市場価格ウォッチ画面の数値がどのデータから出ているかを説明します。
       </p>
 
-      <Section title="先週・今週の価格">
+      <Section title="先月・今月の価格（画面の比較軸）">
         <p>
           本番環境では外部市場価格 API から取得します。
           現在はモックデータ（src/lib/mockData.ts の mockMarketWatchItems）の値を表示しています。
-          <code className="rounded bg-stone-100 px-1">last_week_price</code> が先週、
-          <code className="rounded bg-stone-100 px-1">this_week_price</code> が今週の参考価格（万円）です。
+          画面上は「先月」「今月」の比較として説明しますが、データ上のフィールド名は
+          <code className="rounded bg-stone-100 px-1">last_week_price</code>（先月末相当）、
+          <code className="rounded bg-stone-100 px-1">this_week_price</code>（今月末相当）の参考価格（万円）です。
         </p>
       </Section>
 
       <Section title="変動額・変動率の計算">
         <p>
           変動額と変動率はモックデータに直接入力した値を表示しています。
-          本番では API が返した先週・今週の価格から次の式で自動計算する予定です。
+          本番では API が返した先月・今月の価格から次の式で自動計算する予定です。
         </p>
-        <Formula>変動額（万円） = 今週価格 − 先週価格</Formula>
-        <Formula>変動率（%） = round( 変動額 ÷ 先週価格 × 100, 小数点1位 )</Formula>
+        <Formula>変動額（万円） = 今月価格 − 先月価格</Formula>
+        <Formula>変動率（%） = round( 変動額 ÷ 先月価格 × 100, 小数点1位 )</Formula>
       </Section>
 
       <Section title="傾向マーク（↑ / ↓ / →）">
@@ -226,8 +227,8 @@ function MarketWatchTab() {
 
       <Section title="サマリーカードの数値">
         <p>
-          「値上がり銘柄数」は変動額がプラスの行を数えたもの、「値下がり銘柄数」はマイナスの行を数えたものです。
-          「平均価格変動率」は全銘柄の変動率（%）を単純平均し、小数点 1 位で四捨五入しています。
+          「仕入れ好機」は先月比で変動率が -2% 以下の銘柄数、「売り時アラート」は +3% 以上の銘柄数です。
+          「市場トレンド」は全銘柄の変動率（%）を単純平均し、小数点 1 位で四捨五入しています。
         </p>
         <Formula>平均変動率 = round( 全銘柄の変動率の合計 ÷ 銘柄数, 1 )</Formula>
       </Section>
@@ -261,12 +262,21 @@ function UnrealizedGainTab() {
         <Formula>含み益率（%） = 含み益 ÷ 仕入価格 × 100</Formula>
       </Section>
 
-      <Section title="在庫総含み益（サマリーカード左）">
+      <Section title="在庫総含み益・サマリーカード">
         <p>
-          画面に表示している全銘柄の含み益を足し合わせた合計値です。
-          マイナスの銘柄分も含んで合算しているため、全体での損益バランスが分かります。
+          「在庫総含み益」は全銘柄の含み益の合計です。カード下の「平均 ○%」は、各銘柄の含み益率を単純平均した目安です。
         </p>
         <Formula>在庫総含み益 = 全銘柄の含み益の合計</Formula>
+        <p className="mt-2">
+          「今すぐ売却検討」は含み益率が +15% 以上の銘柄数、「要注意（含み損）」は含み益がマイナスの銘柄数です。
+          保有期間は仕入日からの経過月数（概算）で、6ヶ月以上かつ含み損の銘柄はカード内で追加警告します。
+        </p>
+      </Section>
+
+      <Section title="推奨アクション列">
+        <p>
+          含み益率や含み損・保有月数から、売却・保持・様子見・要対応を自動表示しています（モックのルールベース）。
+        </p>
       </Section>
 
       <Section title="行の背景色">
@@ -306,21 +316,22 @@ function TurnoverAlertTab() {
         <Formula>乖離 = 経過月数 − 想定回転月数</Formula>
       </Section>
 
-      <Section title="アラートレベルの判定">
-        <p>乖離の値に応じて 3 段階で判定しています。</p>
+      <Section title="緊急度（画面上のバッジ）">
+        <p>乖離（経過 − 想定）に応じて 4 段階で表示します。</p>
         <table className="mt-3 w-full border-collapse text-xs">
           <thead>
             <tr className="border-b border-stone-200 text-left">
-              <th className="py-2 pr-2 font-medium text-stone-900">レベル</th>
+              <th className="py-2 pr-2 font-medium text-stone-900">表示</th>
               <th className="py-2 font-medium text-stone-900">条件</th>
-              <th className="py-2 font-medium text-stone-900">意味</th>
+              <th className="py-2 font-medium text-stone-900">推奨アクション</th>
             </tr>
           </thead>
           <tbody className="text-muted-foreground">
             {[
-              ["要対応（赤）", "乖離 ≥ 3ヶ月", "大幅に遅延。早急な販促や値下げ検討が必要"],
-              ["注意（黄）", "1ヶ月 ≤ 乖離 < 3ヶ月", "やや遅延。引き続き状況を監視"],
-              ["正常（緑）", "乖離 < 1ヶ月", "想定内のペースで推移"],
+              ["緊急", "乖離 ≥ +5ヶ月", "値下げ検討"],
+              ["要注意", "+2ヶ月 ≤ 乖離 < +5ヶ月", "販促強化"],
+              ["正常", "-1ヶ月 ≤ 乖離 < +2ヶ月", "現状維持"],
+              ["優秀", "乖離 < -1ヶ月", "追加仕入れ検討"],
             ].map(([level, cond, desc]) => (
               <tr key={level} className="border-b border-stone-100">
                 <td className="py-2 pr-2 text-foreground whitespace-nowrap">{level}</td>
@@ -330,12 +341,23 @@ function TurnoverAlertTab() {
             ))}
           </tbody>
         </table>
+        <div className="mt-2">
+          <Note>
+            モックデータの <code className="rounded bg-stone-100 px-1">alert_level</code> は互換のため残していますが、画面の緊急度は上表の乖離ルールで判定しています。
+          </Note>
+        </div>
+      </Section>
+
+      <Section title="推定機会損失額（サマリーカード）">
+        <p>
+          乖離がプラス（想定より遅い）の銘柄を「滞留」とみなし、それらの仕入価格（万円）を足したあと、平均粗利率 20% を掛けた仮の機会損失の目安です。
+        </p>
+        <Formula>推定機会損失（万円） = round( Σ(滞留銘柄の仕入価格) × 0.2, 小数1位 )</Formula>
       </Section>
 
       <Section title="サマリーカードの数値">
         <p>
-          「要注意銘柄数」は乖離 3ヶ月超（赤）の行数、「平均在庫滞留月数」は全銘柄の経過月数の単純平均、
-          「最長滞留銘柄」は経過月数が最も大きい銘柄のモデル名です。
+          「要注意銘柄数」は乖離が +3ヶ月以上の行数、「最長滞留」は経過月数が最大の銘柄、「推定機会損失額」は上記の仮計算です。
         </p>
       </Section>
     </div>

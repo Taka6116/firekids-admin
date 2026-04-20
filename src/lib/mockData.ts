@@ -183,9 +183,9 @@ export type MarketWatchItem = {
   brand: string;
   model: string;
   ref_number: string;
-  last_week_price: number; // 万円
-  this_week_price: number; // 万円
-  change_amount: number;   // 今週 - 先週（万円）
+  last_week_price: number; // 万円（UIでは先月相当として表示）
+  this_week_price: number; // 万円（UIでは今月相当として表示）
+  change_amount: number;   // 今月 − 先月（万円、モックでは直接入力）
   change_rate: number;     // 変動率（%）
 };
 
@@ -228,6 +228,7 @@ export type TurnoverAlertItem = {
   model: string;
   ref_number: string;
   purchase_date: string;    // "YYYY-MM-DD"
+  purchase_price: number; // 仕入価格（万円）— 機会損失の仮計算用
   elapsed_months: number;   // 仕入からの経過月数
   expected_months: number;  // そのモデルの想定回転月数
   deviation: number;        // elapsed_months - expected_months（正＝遅延）
@@ -235,13 +236,13 @@ export type TurnoverAlertItem = {
 };
 
 export const mockTurnoverAlertItems: TurnoverAlertItem[] = [
-  { brand: "TAG HEUER", model: "カレラ CBN2012", ref_number: "CBN2012", purchase_date: "2025-06-10", elapsed_months: 10.3, expected_months: 4.0, deviation: 6.3, alert_level: "red" },
-  { brand: "SEIKO", model: "グランドセイコー SBGA211", ref_number: "SBGA211", purchase_date: "2025-07-20", elapsed_months: 9.0, expected_months: 5.5, deviation: 3.5, alert_level: "red" },
-  { brand: "OMEGA", model: "スピードマスター 310.30.42.50.01.002", ref_number: "310.30.42.50.01.002", purchase_date: "2025-10-01", elapsed_months: 6.6, expected_months: 5.0, deviation: 1.6, alert_level: "yellow" },
-  { brand: "TUDOR", model: "ブラックベイ M7941A1A0RU", ref_number: "M7941A1A0RU", purchase_date: "2025-09-05", elapsed_months: 7.5, expected_months: 6.0, deviation: 1.5, alert_level: "yellow" },
-  { brand: "CARTIER", model: "タンク マスト WSTA0052", ref_number: "WSTA0052", purchase_date: "2026-01-15", elapsed_months: 3.2, expected_months: 5.0, deviation: -1.8, alert_level: "green" },
-  { brand: "ROLEX", model: "サブマリーナー 126610LN", ref_number: "126610LN", purchase_date: "2025-11-10", elapsed_months: 5.3, expected_months: 2.5, deviation: 2.8, alert_level: "yellow" },
-  { brand: "IWC", model: "ポルトギーゼ IW371604", ref_number: "IW371604", purchase_date: "2026-02-08", elapsed_months: 2.4, expected_months: 6.0, deviation: -3.6, alert_level: "green" },
+  { brand: "TAG HEUER", model: "カレラ CBN2012", ref_number: "CBN2012", purchase_date: "2025-06-10", purchase_price: 85, elapsed_months: 10.3, expected_months: 4.0, deviation: 6.3, alert_level: "red" },
+  { brand: "SEIKO", model: "グランドセイコー SBGA211", ref_number: "SBGA211", purchase_date: "2025-07-20", purchase_price: 62, elapsed_months: 9.0, expected_months: 5.5, deviation: 3.5, alert_level: "red" },
+  { brand: "OMEGA", model: "スピードマスター 310.30.42.50.01.002", ref_number: "310.30.42.50.01.002", purchase_date: "2025-10-01", purchase_price: 88, elapsed_months: 6.6, expected_months: 5.0, deviation: 1.6, alert_level: "yellow" },
+  { brand: "TUDOR", model: "ブラックベイ M7941A1A0RU", ref_number: "M7941A1A0RU", purchase_date: "2025-09-05", purchase_price: 45, elapsed_months: 7.5, expected_months: 6.0, deviation: 1.5, alert_level: "yellow" },
+  { brand: "CARTIER", model: "タンク マスト WSTA0052", ref_number: "WSTA0052", purchase_date: "2026-01-15", purchase_price: 58, elapsed_months: 3.2, expected_months: 5.0, deviation: -1.8, alert_level: "green" },
+  { brand: "ROLEX", model: "サブマリーナー 126610LN", ref_number: "126610LN", purchase_date: "2025-11-10", purchase_price: 128, elapsed_months: 5.3, expected_months: 2.5, deviation: 2.8, alert_level: "yellow" },
+  { brand: "IWC", model: "ポルトギーゼ IW371604", ref_number: "IW371604", purchase_date: "2026-02-08", purchase_price: 98, elapsed_months: 2.4, expected_months: 6.0, deviation: -3.6, alert_level: "green" },
 ];
 
 export type BrandAllocationRow = {

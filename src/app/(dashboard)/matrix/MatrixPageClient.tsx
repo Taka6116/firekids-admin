@@ -2,12 +2,7 @@
 
 import { MatrixScatterPlot } from "@/components/charts/MatrixScatterPlot";
 import { DashboardCard } from "@/components/layout/DashboardCard";
-import {
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMatrix } from "@/hooks/useMatrix";

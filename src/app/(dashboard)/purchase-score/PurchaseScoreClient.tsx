@@ -234,7 +234,7 @@ export function PurchaseScoreClient() {
           <div className="flex flex-wrap gap-3">
             <Select
               value={purchasePriceBand ?? ALL}
-              onValueChange={(v) => setPurchasePriceBand(v === ALL ? undefined : v)}
+              onValueChange={(v) => setPurchasePriceBand(!v || v === ALL ? undefined : v)}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="価格帯" />

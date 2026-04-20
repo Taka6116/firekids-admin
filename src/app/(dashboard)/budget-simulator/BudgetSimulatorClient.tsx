@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -16,8 +16,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBudget } from "@/hooks/useBudget";
 import { mockBrandAllocationDefaults } from "@/lib/mockData";
@@ -92,6 +90,111 @@ function DiffBadge({ diff, budget }: { diff: number; budget: number }) {
 }
 
 // ──────────────────────────────────────────────
+// ブランド日本語名マッピング
+// ──────────────────────────────────────────────
+const BRAND_JA_NAMES: Record<string, string> = {
+  "ROLEX": "ロレックス",
+  "PATEK PHILIPPE": "パテック・フィリップ",
+  "AUDEMARS PIGUET": "オーデマ・ピゲ",
+  "CARTIER": "カルティエ",
+  "OMEGA": "オメガ",
+  "IWC": "IWC",
+  "TUDOR": "チューダー",
+  "SEIKO": "セイコー",
+};
+
+// ──────────────────────────────────────────────
+// カスタムスライダーコンポーネント
+// ──────────────────────────────────────────────
+function BrandSlider({
+  name,
+  value,
+  recommendedRatio,
+  totalBudget,
+  prevValue,
+  onChange,
+}: {
+  name: string;
+  value: number;
+  recommendedRatio: number;
+  totalBudget: number;
+  prevValue: number;
+  onChange: (v: number) => void;
+}) {
+  const jaName = BRAND_JA_NAMES[name] ?? name;
+  const amount = (totalBudget * value) / 100;
+  const diff = value - recommendedRatio; // 正=超過、負=不足
+  const delta = value - prevValue;
+
+  return (
+    <div className="mb-8 space-y-1">
+      {/* ヘッダー行 */}
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-semibold text-stone-800">{jaName}</span>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-2xl font-bold tabular-nums text-stone-900">
+            {value.toFixed(1)}%
+          </span>
+          <span className="text-sm text-stone-500">
+            {formatYen(amount)}
+          </span>
+          {Math.abs(delta) >= 0.1 && (
+            <span className={`text-xs font-semibold ${delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
+              {delta > 0 ? "+" : ""}{delta.toFixed(1)}%
+            </span>
+          )}
+          {/* 推奨値との差分バッジ */}
+          {diff > 2 && (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+              推奨より -{Math.abs(diff).toFixed(1)}%
+            </span>
+          )}
+          {diff < -2 && (
+            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs text-red-700">
+              推奨まで +{Math.abs(diff).toFixed(1)}%
+            </span>
+          )}
+          {Math.abs(diff) <= 2 && (
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+              ✓ 適正
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* カスタムスライダー */}
+      <div className="relative w-full py-1">
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={0.1}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="budget-range w-full"
+          style={{
+            background: `linear-gradient(to right, #8B0000 ${value}%, #e7e5e4 ${value}%)`,
+          }}
+        />
+      </div>
+
+      {/* 推奨値マーカー */}
+      <div className="relative h-5 w-full">
+        <div
+          className="absolute top-0"
+          style={{ left: `clamp(0%, calc(${recommendedRatio}% - 0.5px), calc(100% - 1px))` }}
+        >
+          <div className="h-3 w-px bg-stone-400" />
+          <span className="absolute left-1/2 top-3.5 -translate-x-1/2 whitespace-nowrap text-[11px] text-stone-400">
+            推奨 {recommendedRatio}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
 // メインコンポーネント
 // ──────────────────────────────────────────────
 // スライダー対象は上位4ブランド（インデックス0-3）、インデックス4は「その他」
@@ -100,6 +203,10 @@ const TOP_SLIDER_COUNT = 4;
 export function BudgetSimulatorClient() {
   const { data, isPending, isError, error } = useBudget();
   const [ratios, setRatios] = useState<number[]>(() =>
+    mockBrandAllocationDefaults.map((b) => b.ratioPercent),
+  );
+  // 推奨比率は初期値から固定（normalizeTo100で変化しないよう保持）
+  const initialRatiosRef = useRef<number[]>(
     mockBrandAllocationDefaults.map((b) => b.ratioPercent),
   );
   const [simulatedAt, setSimulatedAt] = useState<string | null>(null);
@@ -113,15 +220,18 @@ export function BudgetSimulatorClient() {
 
   const chartData = useMemo(() => (data ? channelChartData(data) : []), [data]);
 
-  function handleRatioChange(index: number, raw: number) {
-    setPrevRatios(ratios);
-    prevRatiosRef.current = ratios;
+  const handleRatioChange = useCallback((index: number, raw: number) => {
+    setPrevRatios((prev) => {
+      prevRatiosRef.current = prev;
+      return prev;
+    });
     setRatios((prev) => {
+      setPrevRatios(prev);
       const next = [...prev];
       next[index] = raw;
       return normalizeTo100(next);
     });
-  }
+  }, []);
 
   function handleRunSimulation() {
     setSimRunning(true);
@@ -335,74 +445,58 @@ export function BudgetSimulatorClient() {
       </div>
 
       {/* ──────────── セクション3: 予算配分シミュレーター ──────────── */}
-      <div className="no-print">
-        <DashboardCard>
-          <CardHeader>
-            <CardTitle className="text-xl">予算配分シミュレーター</CardTitle>
-            <CardDescription>
-              スライダーを動かして最適な配分を試してみましょう。合計は自動的に100%に調整されます。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {mockBrandAllocationDefaults.slice(0, TOP_SLIDER_COUNT).map((row, index) => {
-              const prevRatio = prevRatios[index] ?? ratios[index] ?? 0;
-              const currentRatio = ratios[index] ?? 0;
-              const delta = currentRatio - prevRatio;
-              return (
-                <div key={row.id} className="space-y-2">
-                  <div className="flex items-start justify-between gap-2 text-sm">
-                    <span className="font-medium text-stone-800">{row.name}</span>
-                    <div className="text-right">
-                      <span className="tabular-nums text-stone-700">
-                        {currentRatio.toFixed(1)}%
-                      </span>
-                      <span className="mx-2 text-stone-300">|</span>
-                      <span className="text-muted-foreground">
-                        推奨 <span className="font-medium text-foreground">{formatYen((totalBudget * currentRatio) / 100)}</span>
-                      </span>
-                      {Math.abs(delta) >= 0.1 && (
-                        <span className={`ml-2 text-xs font-semibold ${delta > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                          {delta > 0 ? "+" : ""}{delta.toFixed(1)}%
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <Slider
-                    min={0}
-                    max={100}
-                    step={0.5}
-                    value={currentRatio}
-                    onValueChange={(v) => {
-                      const next = typeof v === "number" ? v : Array.isArray(v) ? v[0]! : 0;
-                      handleRatioChange(index, next);
-                    }}
-                  />
-                </div>
-              );
-            })}
+      <div className="no-print rounded-xl border border-stone-200 bg-white p-8 shadow-sm">
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-stone-900">予算配分シミュレーター</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            スライダーを動かして最適な配分を試してみましょう。合計は自動的に100%に調整されます。
+          </p>
+        </div>
 
-            {/* その他ブランド（スライダーなし） */}
-            {mockBrandAllocationDefaults[TOP_SLIDER_COUNT] && (
-              <div className="flex items-center justify-between rounded-md bg-stone-50 px-4 py-3 text-sm text-stone-600">
-                <span className="font-medium">その他ブランド（自動調整）</span>
-                <span className="tabular-nums">
+        <div>
+          {mockBrandAllocationDefaults.slice(0, TOP_SLIDER_COUNT).map((row, index) => {
+            const prevRatio = prevRatios[index] ?? ratios[index] ?? 0;
+            const currentRatio = ratios[index] ?? 0;
+            // 推奨比率は初回ロード時の初期値を固定で使用
+            const recommendedRatio = initialRatiosRef.current[index] ?? currentRatio;
+            return (
+              <BrandSlider
+                key={row.id}
+                name={row.name}
+                value={currentRatio}
+                recommendedRatio={recommendedRatio}
+                totalBudget={totalBudget}
+                prevValue={prevRatio}
+                onChange={(v) => handleRatioChange(index, v)}
+              />
+            );
+          })}
+
+          {/* その他ブランド（スライダーなし） */}
+          {mockBrandAllocationDefaults[TOP_SLIDER_COUNT] && (
+            <div className="flex items-center justify-between rounded-lg bg-stone-50 px-5 py-3.5 text-sm text-stone-600">
+              <span className="font-medium text-stone-700">その他ブランド（自動調整）</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xl font-bold tabular-nums text-stone-800">
                   {othersRatio.toFixed(1)}%
-                  <span className="ml-2 text-muted-foreground">
-                    {formatYen((totalBudget * othersRatio) / 100)}
-                  </span>
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {formatYen((totalBudget * othersRatio) / 100)}
                 </span>
               </div>
-            )}
-
-            <Separator />
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">配分合計</span>
-              <span className={Math.abs(totalPct - 100) < 0.05 ? "font-medium text-emerald-700" : "font-medium text-amber-700"}>
-                {totalPct.toFixed(1)}%
-              </span>
             </div>
-          </CardContent>
-        </DashboardCard>
+          )}
+        </div>
+
+        <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4 text-sm">
+          <span className="text-muted-foreground">配分合計</span>
+          <span className={`text-lg font-bold tabular-nums ${Math.abs(totalPct - 100) < 0.05 ? "text-emerald-700" : "text-red-700"}`}>
+            {totalPct.toFixed(1)}%
+            <span className="ml-1 text-xs font-normal">
+              {Math.abs(totalPct - 100) < 0.05 ? "✓ 合計100%" : "（100%に調整中）"}
+            </span>
+          </span>
+        </div>
       </div>
 
       {/* ──────────── セクション4: シミュレーション結果 ──────────── */}
