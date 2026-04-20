@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api";
@@ -11,29 +12,34 @@ export type MatrixFilters = {
   channel?: MatrixItem["channel"];
 };
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-export function useMatrix(filters: MatrixFilters = {}) {
+/** 全件を1回だけ取得するクエリ。フィルタリングはクライアント側で行う */
+function useMatrixAll() {
   return useQuery({
-    queryKey: ["matrix", filters],
+    queryKey: ["matrix-all"],
     queryFn: async (): Promise<MatrixItem[]> => {
       if (USE_MOCK) {
-        await delay(250);
-        const rows = filters.channel
-          ? mockMatrixItems.filter((r) => r.channel === filters.channel)
-          : mockMatrixItems;
-        return rows;
+        return mockMatrixItems;
       }
-      const { data: raw } = await apiClient.get<unknown>("/admin/matrix", {
-        params: filters,
-      });
+      const { data: raw } = await apiClient.get<unknown>("/admin/matrix");
       const parsed = matrixResponseSchema.parse(raw);
       return parsed.items;
     },
     staleTime: 5 * 60 * 1000,
   });
+}
+
+export function useMatrix(filters: MatrixFilters = {}) {
+  const query = useMatrixAll();
+
+  const data = useMemo(() => {
+    if (!query.data) return undefined;
+    if (!filters.channel) return query.data;
+    return query.data.filter((r) => r.channel === filters.channel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.data, filters.channel]);
+
+  return {
+    ...query,
+    data,
+  };
 }

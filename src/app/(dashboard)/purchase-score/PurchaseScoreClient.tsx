@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { DashboardCard } from "@/components/layout/DashboardCard";
@@ -40,26 +40,30 @@ function vintageDemandIndex(rows: PurchaseScoreItem[]): number {
 }
 
 export function PurchaseScoreClient() {
-  const purchaseBrand = useFilterStore((s) => s.purchaseBrand);
   const purchaseChannel = useFilterStore((s) => s.purchaseChannel);
   const purchasePriceBand = useFilterStore((s) => s.purchasePriceBand);
-  const setPurchaseBrand = useFilterStore((s) => s.setPurchaseBrand);
   const setPurchaseChannel = useFilterStore((s) => s.setPurchaseChannel);
   const setPurchasePriceBand = useFilterStore((s) => s.setPurchasePriceBand);
 
-  const filters = useMemo(
-    () => ({
-      brand: purchaseBrand,
-      channel: purchaseChannel,
-      price_band: purchasePriceBand,
-    }),
-    [purchaseBrand, purchaseChannel, purchasePriceBand],
+  // ブランドタブの状態（"__all__" = 全ブランド）
+  const [activeBrand, setActiveBrand] = useState<string>(ALL);
+
+  // 全件クエリ（API は 1 回だけ。フィルタリングはクライアント側で完結）
+  const { data: allRows = [], isPending, isError, error } = usePurchaseScore({});
+
+  const activeBrandValue = activeBrand === ALL ? undefined : activeBrand;
+
+  // フィルター適用はクライアント側 useMemo のみ（API 追加リクエストなし）
+  const data = useMemo(
+    () =>
+      allRows.filter((row) => {
+        if (activeBrandValue && row.brand !== activeBrandValue) return false;
+        if (purchaseChannel && row.channel !== purchaseChannel) return false;
+        if (purchasePriceBand && row.price_band !== purchasePriceBand) return false;
+        return true;
+      }),
+    [allRows, activeBrandValue, purchaseChannel, purchasePriceBand],
   );
-
-  const { data: allRows = [] } = usePurchaseScore({});
-  const { data: rawData, isPending, isError, error } = usePurchaseScore(filters);
-
-  const data = useMemo(() => rawData ?? [], [rawData]);
 
   const brandOptions = useMemo(
     () => uniqueSorted(allRows.map((r) => r.brand)),
@@ -135,35 +139,35 @@ export function PurchaseScoreClient() {
         </DashboardCard>
       </div>
 
+      {/* ブランドタブ */}
+      <div className="overflow-x-auto">
+        <div className="flex min-w-max gap-1.5 pb-0.5">
+          {[{ value: ALL, label: "全ブランド" }, ...brandOptions.map((b) => ({ value: b, label: b }))].map(
+            (opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setActiveBrand(opt.value)}
+                className={
+                  activeBrand === opt.value
+                    ? "rounded-full bg-[#8B0000] px-4 py-1.5 text-sm font-semibold text-white transition-colors"
+                    : "rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-900"
+                }
+              >
+                {opt.label}
+              </button>
+            ),
+          )}
+        </div>
+      </div>
+
       <DashboardCard>
         <CardHeader className="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <CardTitle className="text-base">フィルター</CardTitle>
-            <CardDescription>ブランド / 価格帯 / 仕入区分</CardDescription>
+            <CardDescription>価格帯 / 仕入区分</CardDescription>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Select
-              value={purchaseBrand ?? ALL}
-              onValueChange={(v) => {
-                if (v == null || v === ALL) {
-                  setPurchaseBrand(undefined);
-                  return;
-                }
-                setPurchaseBrand(v);
-              }}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="ブランド" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>全ブランド</SelectItem>
-                {brandOptions.map((b) => (
-                  <SelectItem key={b} value={b}>
-                    {b}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select
               value={purchasePriceBand ?? ALL}
               onValueChange={(v) => {

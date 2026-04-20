@@ -8,29 +8,33 @@ const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
+  preload: true,
 });
 
 const notoSansJp = Noto_Sans_JP({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "700"],
   variable: "--font-noto-sans-jp",
   display: "swap",
+  preload: false,
 });
 
 /** ログイン等の見出し用（セリフ・ラグジュアリー寄り） */
 const notoSerifJp = Noto_Serif_JP({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["500", "700"],
   variable: "--font-display",
   display: "swap",
+  preload: false,
 });
 
 /** 英字ブランド名用 */
 const playfair = Playfair_Display({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["500", "700"],
   variable: "--font-brand",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {

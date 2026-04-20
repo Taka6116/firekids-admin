@@ -1,9 +1,5 @@
-import { DashboardHandbook } from "@/content/DashboardHandbook";
+import { redirect } from "next/navigation";
 
-export default function BudgetHandbookPage() {
-  return (
-    <div className="space-y-6">
-      <DashboardHandbook />
-    </div>
-  );
+export default function BudgetHandbookRedirectPage() {
+  redirect("/handbook");
 }
